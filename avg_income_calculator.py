@@ -1,0 +1,3 @@
+
+def calcAvgIncome(latitude, longitude):
+
