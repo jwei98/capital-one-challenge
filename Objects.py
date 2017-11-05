@@ -20,7 +20,7 @@ class ListingsTracker:
 
 	# returns list of neighbourhoods
 	def readNeighbourhoods(self):
-		with open('./data/neighbourhoods.csv','rb') as neighbourhoodsFile:
+		with open('./data/neighbourhoods.csv', newline='', errors='ignore') as neighbourhoodsFile:
 			reader = csv.DictReader(neighbourhoodsFile, delimiter=',')
 			# read through entries, adding to neighbourhood list and price per neighbourhood dictionary
 			for row in reader:
@@ -32,7 +32,7 @@ class ListingsTracker:
 	def readListings(self):
 		neighbourhoodTotalPrices = {}
 		neighbourhoodCount = {}
-		with open('./data/listings.csv', 'rb') as listingsFile:
+		with open('./data/listings.csv', newline='', errors='ignore') as listingsFile:
 			# DictReader reads specific column
 			reader = csv.DictReader(listingsFile, delimiter=',')
 			for row in reader:
