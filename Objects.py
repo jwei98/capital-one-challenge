@@ -10,6 +10,13 @@ class Listing:
 
 class ListingsTracker:
 	def __init__(self):
+		self.latitudes = []
+		self.longitudes = []
+		self.ids = []
+		self.latitudesByNeighbourhood = {}
+		self.longitudesByNeighbourhood = {}
+		self.idsByNeighbourhood = {}
+
 		self.neighbourhoods = []
 		self.ppn = {}
 		self.listings = []
@@ -26,6 +33,9 @@ class ListingsTracker:
 			for row in reader:
 				neighbourhood = row["neighbourhood"]
 				self.neighbourhoods.append(neighbourhood)
+				self.latitudesByNeighbourhood[neighbourhood] = []
+				self.longitudesByNeighbourhood[neighbourhood] = []
+				self.idsByNeighbourhood[neighbourhood] = []
 				self.ppn[neighbourhood] = 0
 
 
@@ -40,6 +50,11 @@ class ListingsTracker:
 				if row["id"] and row["latitude"] and row["longitude"] and row["price"] and row["neighbourhood_cleansed"]:
 					newListing = Listing(row["id"], row["latitude"], row["longitude"], row["price"].replace(',','').replace('$',''), row["neighbourhood_cleansed"])
 					self.listings.append(newListing)
+					self.latitudes.append(row["latitude"])
+					self.longitudes.append(row["longitude"])
+					self.latitudesByNeighbourhood[row["neighbourhood_cleansed"]].append(row["latitude"])
+					self.longitudesByNeighbourhood[row["neighbourhood_cleansed"]].append(row["longitude"])
+					self.ids.append(row["id"])
 
 					# edit price per neighbourhood dictionary
 					newNeighbourhood = newListing.neighbourhood
@@ -66,6 +81,26 @@ class ListingsTracker:
 		return self.listings
 	def getNeighbourhoods(self):
 		return self.neighbourhoods
+
+
+	def getLongitudes(self, neighbourhood=None):
+		if neighbourhood is None:
+			return self.longitudes
+		else:
+			return self.longitudesByNeighbourhood[neighbourhood]
+		
+	def getLatitudes(self, neighbourhood=None):
+		if neighbourhood is None:
+			return self.latitudes
+		else:
+			return self.latitudesByNeighbourhood[neighbourhood]
+
+	def getIds(self, neighbourhood=None):
+		if neighbourhood is None:
+			return self.ids
+		else:
+			return self.idsByNeighbourhood[neighbourhood]
+
 	def getPPN(self):
 		return self.ppn
 	def printPPN(self):
