@@ -13,16 +13,21 @@ class ListingsTracker:
 		self.latitudes = []
 		self.longitudes = []
 		self.ids = []
+		self.neighbourhoods = []
+		self.ppn = {}
+		self.listings = []
+		self.freeNightsPerPrice = {}
+		self.listingsPerPrice = {}
+
+		# for neighbourhood specific things
 		self.latitudesByNeighbourhood = {}
 		self.longitudesByNeighbourhood = {}
 		self.idsByNeighbourhood = {}
 
-		self.neighbourhoods = []
-		self.ppn = {}
-		self.listings = []
-		
+
 		self.readNeighbourhoods()
 		self.readListings()
+		self.readAvailabilities()
 
 
 	# returns list of neighbourhoods
@@ -68,21 +73,28 @@ class ListingsTracker:
 		for neighbourhood in neighbourhoodTotalPrices:
 			self.ppn[neighbourhood] = neighbourhoodTotalPrices[neighbourhood] / neighbourhoodCount[neighbourhood]
 
+	def readAvailabilities(self):
+		with open('./data/calendar_available_only.csv', newline='', errors='ignore') as availabilityFile:
+			reader = csv.DictReader(availabilityFile, delimiter=',')
+			# read through entries, adding to neighbourhood list and price per neighbourhood dictionary
+			for row in reader:
+				if row["price"] and row["listing_id"]:
+					price = float(row["price"].replace(',','').replace('$',''))
+					if price in self.freeNightsPerPrice:
+						self.freeNightsPerPrice[price] = self.freeNightsPerPrice[price] + 1
+						if not row["listing_id"] in self.listingsPerPrice[price]:
+							self.listingsPerPrice[price].append(row["listing_id"])
+					else:
+						self.freeNightsPerPrice[price] = 1
+						self.listingsPerPrice[price] = [row["listing_id"]]
 					
-
-	# mutators
-	def addListing(self, newListing):
-		self.listings.append(newListing)
-	def addNeighbourhood(self, newNeighbourhood):
-		self.neighbourhoods.append(newNeighbourhood)
+					
 
 	# getters
 	def getListings(self):
 		return self.listings
 	def getNeighbourhoods(self):
 		return self.neighbourhoods
-
-
 	def getLongitudes(self, neighbourhood=None):
 		if neighbourhood is None:
 			return self.longitudes
@@ -103,9 +115,19 @@ class ListingsTracker:
 
 	def getPPN(self):
 		return self.ppn
+	def getBookedNightsPerPrice(self):
+		bookedNightsPerPrice = {}
+		for price in self.freeNightsPerPrice:
+			if price < 500 and price > 95:
+				numberListingsPerPrice = len(self.listingsPerPrice[price])
+				print(str(price) + ": " + str(self.freeNightsPerPrice[price]) + " : " + str(numberListingsPerPrice))
+				bookedNightsPerPrice[price] = (356 - float(self.freeNightsPerPrice[price]/numberListingsPerPrice))/52
+		return bookedNightsPerPrice
+
 	def printPPN(self):
 		for n in self.ppn:
 			print ("{0}: ${1:.2f}".format(n,self.ppn[n]))
+
 
 
 

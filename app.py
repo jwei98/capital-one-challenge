@@ -5,6 +5,9 @@ from Objects import ListingsTracker
 import avg_income_calculator as calculator
 import plotly.graph_objs as go
 import colorlover as cl
+import json
+from collections import OrderedDict
+import plotly.figure_factory as ff
 
 mapbox_access_token = 'pk.eyJ1IjoianVzdGlud2VpIiwiYSI6ImNqOWdqd2JlMzJwODMyeHBhZ3JzZTBqcm0ifQ.BR96rueM9hQkPc7GeozPiw'
 
@@ -32,8 +35,10 @@ generateColors(colors)
 
 def generateMap():
 	data = []
-	counter = 0
+	colorCounter = 0
+	listingsCounter = 0
 	for n in listingsTracker.getNeighbourhoods():
+		
 		data.append(
 			    go.Scattermapbox(
 			        name=n,
@@ -42,12 +47,12 @@ def generateMap():
 			        mode='markers',
 			        marker= go.Marker(
 			            size=5,
-			            color=colors[counter],
+			            color=colors[colorCounter],
 			        ),
-			        text=listingsTracker.getIds(n),
 			    )
 		)
-		counter = counter + 1
+		
+		colorCounter = colorCounter + 1
 	return html.Div(
     	dcc.Graph(
 	    	id='map-graph',
@@ -70,7 +75,7 @@ def generateMap():
 				    height=600
 				)
 	    	}
-	    )
+	    ),
     )
 def generatePPNChart():
 	neighbourhoods = []
@@ -91,9 +96,54 @@ def generatePPNChart():
 		            ],
 		            'layout': {
 		                'title': 'Average Price per Night',
+		                'visible': True,
 		            }
 				}
 			)
+
+def generateDropdown():
+	complete_data = []
+	values = []
+	for neighbourhood in listingsTracker.getNeighbourhoods():
+		data = OrderedDict()
+		data['label'] = neighbourhood
+		data['value'] = neighbourhood[0:4]
+		values.append(neighbourhood)
+		complete_data.append(data)
+	return dcc.Dropdown(
+		id='neighbourhood-selector',
+	    options= complete_data,
+	    multi=True,
+	    value=values
+	)
+def generateBookedNightsPerPriceChart():
+	bnp = listingsTracker.getBookedNightsPerPrice()
+	prices = list(bnp.keys())
+	nights = list(bnp.values())
+	layout = dict(title = 'Booked Nights Per Price',
+    )
+	return dcc.Graph(
+			figure = go.Figure (
+				data=[
+					go.Scatter(
+						x = prices,
+						y = nights,
+						mode= 'lines+markers',
+						line = dict(
+							color = ('rgb(205, 12, 24)'),
+				        	width = 4
+				        )
+					),
+				],
+				layout=go.Layout(
+					title='Average Number of Listings Per Price Every Year',
+				)
+
+			),
+			id='bnp-chart'
+
+	)
+
 # page layout
 app.layout = html.Div(children=[
 
@@ -111,6 +161,9 @@ app.layout = html.Div(children=[
         ], className="five columns"),
     ], className="row"),
 
+	generateDropdown(),
+
+	generateBookedNightsPerPriceChart(),
 
 	# inputs for latitude/longitude average income calculator
 	html.H3(children='Given latitude and longitude, calculate average weekly income:'),
@@ -138,6 +191,8 @@ app.layout = html.Div(children=[
 ])
 
 # given latitude/longitude, calculate average weekly income
+
+
 @app.callback(
 	dash.dependencies.Output(component_id='average-weekly-income-output', component_property='children'),
 	[dash.dependencies.Input(component_id='calculate-average-weekly-income', component_property='n_clicks')],
