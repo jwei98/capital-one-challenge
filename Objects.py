@@ -6,7 +6,7 @@ class Listing:
 		self.coords = [latitude, longitude]
 		self.price = float(price)
 		self.neighbourhood = neighbourhood_cleansed
-
+		self.nightsBookedPerWeek = 0
 
 class ListingsTracker:
 	def __init__(self):
