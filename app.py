@@ -116,54 +116,88 @@ def generateDropdown():
 	    multi=True,
 	    value=values
 	)
-def generateBookedNightsPerPriceChart():
-	bnp = listingsTracker.getBookedNightsPerPrice()
-	prices = list(bnp.keys())
-	nights = list(bnp.values())
-	layout = dict(title = 'Booked Nights Per Price',
-    )
+def generateReviewScoresPerNeighbourhoodChart():
+	reviewScores = listingsTracker.getReviewScoresPerNeighbourhood()
+	neighbourhoods = []
+	scores = []
+	for n in listingsTracker.getNeighbourhoods():
+		neighbourhoods.append(n)
+		scores.append(reviewScores.get(n))
+	
+	counter = 0
 	return dcc.Graph(
-			figure = go.Figure (
-				data=[
-					go.Scatter(
-						x = prices,
-						y = nights,
-						mode= 'lines+markers',
-						line = dict(
-							color = ('rgb(205, 12, 24)'),
-				        	width = 4
-				        )
-					),
-				],
-				layout=go.Layout(
-					title='Average Number of Listings Per Price Every Year',
-				)
+			id='rs-graph',
+			figure = {
+				'data': [
+	                {'x': neighbourhoods,
+	                'y': scores,
+	                'type': 'bar',
+	                'name': 'Review Score',
+	                'marker': dict(color = colors[0:37])
+	                }
+	            ],
+	            'layout': {
+	                'title': 'Average Review Score per Neighbourhood',
+	                'visible': True,
+	                'yaxis': dict(range=[min(scores)-5,100])
+	            }
+			}
+	)
 
-			),
-			id='bnp-chart'
+def generateValueChart():
+	reviewScores = listingsTracker.getReviewScoresPerNeighbourhood()
 
+	neighbourhoods = []
+	values = []
+	for n in listingsTracker.getNeighbourhoods():
+		neighbourhoods.append(n)
+		values.append(reviewScores.get(n)/ppnData.get(n))
+	counter = 0
+	return dcc.Graph(
+			id='value-graph',
+			figure = {
+				'data': [
+	                {'x': neighbourhoods,
+	                'y': values,
+	                'type': 'bar',
+	                'name': 'Value',
+	                'marker': dict(color = colors[0:37])
+	                }
+	            ],
+	            'layout': {
+	                'title': 'Average Value (Score/Price) per Neighbourhood',
+	                'visible': True,
+	            }
+			}
 	)
 
 # page layout
 app.layout = html.Div(children=[
 
 	html.H1(children='Optimizing Airbnb Listings'),
+	html.P("by Justin Wei"),
 
 	html.Div(children=''' '''),
 
-	html.Div([
-        html.Div([
-            generateMap()
-        ], className="seven columns"),
+	
+    html.Div([
+        generateMap()
+    ]),
 
-        html.Div([
-            generatePPNChart()
-        ], className="five columns"),
-    ], className="row"),
+	html.Div([
+	    dcc.Tabs(
+	    	tabs=[
+	    		{'label': 'Average Price Per Night', 'value': 0},
+	    		{'label': 'Average Review Score', 'value': 1},
+	    		{'label': 'Average Value', 'value': 2},
+	    	],
+	    	value=0,
+	    	id='tabs'
+	    ),
+	    html.Div(id='tab-output')
+    ]),
 
 	generateDropdown(),
-
-	generateBookedNightsPerPriceChart(),
 
 	# inputs for latitude/longitude average income calculator
 	html.H3(children='Given latitude and longitude, calculate average weekly income:'),
@@ -191,7 +225,16 @@ app.layout = html.Div(children=[
 ])
 
 # given latitude/longitude, calculate average weekly income
+@app.callback(dash.dependencies.Output('tab-output', 'children'), [dash.dependencies.Input('tabs', 'value')])
+def display_content(value):
+    if value == 0:
+    	return generatePPNChart()
+    elif value == 1:
+    	return generateReviewScoresPerNeighbourhoodChart()
+    else:
+    	return generateValueChart()
 
+    
 
 @app.callback(
 	dash.dependencies.Output(component_id='average-weekly-income-output', component_property='children'),

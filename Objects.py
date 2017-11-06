@@ -16,6 +16,7 @@ class ListingsTracker:
 		self.neighbourhoods = []
 		self.ppn = {}
 		self.listings = []
+		self.reviewScores = {}
 		self.freeNightsPerPrice = {}
 		self.listingsPerPrice = {}
 
@@ -52,7 +53,7 @@ class ListingsTracker:
 			reader = csv.DictReader(listingsFile, delimiter=',')
 			for row in reader:
 				# cut out listings where not all fields exist
-				if row["id"] and row["latitude"] and row["longitude"] and row["price"] and row["neighbourhood_cleansed"]:
+				if row["id"] and row["latitude"] and row["longitude"] and row["price"] and row["neighbourhood_cleansed"] and row["review_scores_rating"]:
 					newListing = Listing(row["id"], row["latitude"], row["longitude"], row["price"].replace(',','').replace('$',''), row["neighbourhood_cleansed"])
 					self.listings.append(newListing)
 					self.latitudes.append(row["latitude"])
@@ -66,12 +67,19 @@ class ListingsTracker:
 					if newNeighbourhood in neighbourhoodTotalPrices:
 						neighbourhoodTotalPrices[newNeighbourhood] = neighbourhoodTotalPrices[newNeighbourhood] + newListing.price
 						neighbourhoodCount[newNeighbourhood] = neighbourhoodCount[newNeighbourhood] + 1
+						self.reviewScores[newNeighbourhood] = self.reviewScores[newNeighbourhood] + float(row["review_scores_rating"])
+
 					else:
 						neighbourhoodTotalPrices[newNeighbourhood] = newListing.price
-						neighbourhoodCount[newNeighbourhood] = 0
+						neighbourhoodCount[newNeighbourhood] = 1
+						self.reviewScores[newNeighbourhood] = float(row["review_scores_rating"])
+
+
 
 		for neighbourhood in neighbourhoodTotalPrices:
 			self.ppn[neighbourhood] = neighbourhoodTotalPrices[neighbourhood] / neighbourhoodCount[neighbourhood]
+			self.reviewScores[neighbourhood] = self.reviewScores[neighbourhood] / neighbourhoodCount[neighbourhood]
+			
 
 	def readAvailabilities(self):
 		with open('./data/calendar_available_only.csv', newline='', errors='ignore') as availabilityFile:
@@ -118,11 +126,14 @@ class ListingsTracker:
 	def getBookedNightsPerPrice(self):
 		bookedNightsPerPrice = {}
 		for price in self.freeNightsPerPrice:
-			if price < 500 and price > 95:
+			if price < 600:
 				numberListingsPerPrice = len(self.listingsPerPrice[price])
 				print(str(price) + ": " + str(self.freeNightsPerPrice[price]) + " : " + str(numberListingsPerPrice))
-				bookedNightsPerPrice[price] = (356 - float(self.freeNightsPerPrice[price]/numberListingsPerPrice))/52
+				bookedNightsPerPrice[price] = (178 - float(self.freeNightsPerPrice[price]/numberListingsPerPrice))/26
 		return bookedNightsPerPrice
+
+	def getReviewScoresPerNeighbourhood(self):
+		return self.reviewScores
 
 	def printPPN(self):
 		for n in self.ppn:
