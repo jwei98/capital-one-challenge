@@ -6,6 +6,7 @@ import avg_income_calculator as calculator
 
 app = dash.Dash()
 server = app.server
+app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
 
 
 listingsTracker = ListingsTracker()
@@ -52,6 +53,7 @@ app.layout = html.Div(children=[
 ])
 
 
+# given latitude/longitude, calculate average weekly income
 @app.callback(
 	dash.dependencies.Output(component_id='average-weekly-income-output', component_property='children'),
 	[dash.dependencies.Input(component_id='calculate-average-weekly-income', component_property='n_clicks')],
@@ -60,8 +62,6 @@ app.layout = html.Div(children=[
 )
 def calculateAverageWeeklyIncome(n_clicks, latitude, longitude):
 	return 'The listing at {}, {} is located in the {} neighborhood!'.format(latitude,longitude,calculator.getNeighbourhood(latitude, longitude))
-
-app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
 
 
 if __name__ == '__main__':
