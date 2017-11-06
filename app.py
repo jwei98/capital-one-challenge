@@ -5,8 +5,9 @@ from Objects import ListingsTracker
 import avg_income_calculator as calculator
 
 app = dash.Dash()
-server = app.server
 app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
+
+server = app.server
 
 
 listingsTracker = ListingsTracker()
@@ -62,7 +63,6 @@ app.layout = html.Div(children=[
 )
 def calculateAverageWeeklyIncome(n_clicks, latitude, longitude):
 	return 'The listing at {}, {} is located in the {} neighborhood!'.format(latitude,longitude,calculator.getNeighbourhood(latitude, longitude))
-
 
 if __name__ == '__main__':
 	app.run_server(debug=True)
