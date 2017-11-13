@@ -43,6 +43,8 @@ class Neighbourhood:
 		return self.latitudes
 	def getLongitudes(self):
 		return self.longitudes
+	def getNumberListings(self):
+		return self.numberListings
 	# returns average price per night of neighbourhood
 	def getAveragePPN(self):
 		return self.totalCost / self.numberListings
@@ -138,4 +140,10 @@ class ListingsTracker:
 
 	def getOptimalPrice(self, neighbourhood):
 		return self.neighbourhoods[neighbourhood].getIdealPPN()
+
+	def getNumberListingsPerNeighbourhood(self):
+		numberListingsPerNeighbourhood = {}
+		for neighbourhood in self.neighbourhoods:
+			numberListingsPerNeighbourhood[neighbourhood] = self.neighbourhoods[neighbourhood].getNumberListings()
+		return numberListingsPerNeighbourhood
 

@@ -7,11 +7,14 @@ import plotly.graph_objs as go
 import colorlover as cl
 import json
 from collections import OrderedDict
+import os
+from flask import Flask, send_from_directory
 
+server = Flask(__name__, static_folder='static')
+mapbox_access_token = os.environ.get('MAPBOX_KEY')
 
-mapbox_access_token = 'pk.eyJ1IjoianVzdGlud2VpIiwiYSI6ImNqOWdqd2JlMzJwODMyeHBhZ3JzZTBqcm0ifQ.BR96rueM9hQkPc7GeozPiw'
-
-app = dash.Dash()
+app = dash.Dash(server=server)
+app.title = 'myAirbnb'
 app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
 app.config['suppress_callback_exceptions']=True
 
@@ -57,7 +60,7 @@ def generateMap(latitude = None, longitude = None):
 		
 		colorCounter = colorCounter + 1
 	if userInput:
-		zoom = 13
+		zoom = 11.5
 		data.append(
 			go.Scattermapbox(
 			        name="Your Location",
@@ -76,7 +79,7 @@ def generateMap(latitude = None, longitude = None):
 	    	figure= {
 	    		'data' : go.Data(data),
 				'layout' : go.Layout(
-					title= 'Map of SF Listings',
+					title= 'Map of SF Airbnb Listings',
 				    autosize=True,
 				    hovermode='closest',
 				    mapbox=dict(
@@ -165,7 +168,33 @@ def generateDropdown(isDisable):
 	    value=values,
 	    disabled=isDisable
 	)
-
+def generateNumberListingsPerNeighbourhoodChart():
+	numberListings = listingsTracker.getNumberListingsPerNeighbourhood()
+	neighbourhoods = []
+	count = []
+	for n in listingsTracker.getNeighbourhoods():
+		neighbourhoods.append(n)
+		count.append(numberListings.get(n))
+	
+	counter = 0
+	return dcc.Graph(
+			id='rs-graph',
+			figure = {
+				'data': [
+	                {'x': neighbourhoods,
+	                'y': count,
+	                'type': 'bar',
+	                'name': 'Number Listings per Neighbourhood',
+	                'marker': dict(color = colors[0:37])
+	                }
+	            ],
+	            'layout': {
+	                'title': 'Number Listings per Neighbourhood',
+	                'visible': True,
+	                'yaxis': dict(range=[min(count)-5,max(count)+5]),
+	            }
+			}
+	)
 def generateReviewScoresPerNeighbourhoodChart():
 	reviewScores = listingsTracker.getReviewScoresPerNeighbourhood()
 	neighbourhoods = []
@@ -249,9 +278,10 @@ def generateAllCharts():
 	return html.Div([
 	    dcc.Tabs(
 	    	tabs=[
-	    		{'label': 'Average Price Per Night', 'value': 0},
-	    		{'label': 'Average Review Score', 'value': 1},
-	    		{'label': 'Average Value', 'value': 2},
+	    		{'label': 'Number of Listings', 'value': 0},
+	    		{'label': 'Average Price Per Night', 'value': 1},
+	    		{'label': 'Average Review Score', 'value': 2},
+	    		{'label': 'Average Value', 'value': 3},
 	    	],
 	    	value=0,
 	    	id='tabs'
@@ -260,9 +290,12 @@ def generateAllCharts():
     ])
 	
 
-# page layout
-app.layout = html.Div(children=[
 
+
+
+# PAGE LAYOUT
+
+app.layout = html.Div(children=[
 	generateHeader(),
     html.Div([
     	html.Div([
@@ -274,16 +307,31 @@ app.layout = html.Div(children=[
     ], className="row"),
 
 	generateAllCharts(),
+	html.Br(),
+	html.Br(),
+	html.Div([
+		html.A('View Project Github', href='https://github.com/jwei98/capital-one-challenge'),
+	], style = {
+		'text-align': 'center'
+	})
+	
 
 ])
+
+
+
+# CALLBACKS
+
 
 
 # given latitude/longitude, calculate average weekly income
 @app.callback(dash.dependencies.Output('tab-output', 'children'), [dash.dependencies.Input('tabs', 'value')])
 def display_content(value):
     if value == 0:
-    	return generatePPNChart()
+    	return generateNumberListingsPerNeighbourhoodChart()
     elif value == 1:
+    	return generatePPNChart()
+    elif value == 2:
     	return generateReviewScoresPerNeighbourhoodChart()
     else:
     	return generateValueChart()
@@ -314,7 +362,7 @@ def calculateAverageWeeklyIncome(n_clicks, neighbourhoodSelector, latitude, long
 		geopy_neighbourhood = calculator.getNeighbourhood(latitude, longitude)
 		# 1) bad location
 		if geopy_neighbourhood is None:
-			return 'Sorry! We could not identify the neighbourhood of the listing at ({}, {})... Please try again! '.format(latitude,longitude)
+			return 'Sorry! It appears your listing at ({}, {}) does not exist any San Francisco neighbourhood... Please try again! '.format(latitude,longitude)
 		# 2) found everything perfectly
 		elif geopy_neighbourhood in listingsTracker.getNeighbourhoods():
 			return generateFoundListingNeighbourhood(latitude, longitude, geopy_neighbourhood, True)
@@ -358,6 +406,10 @@ def mapCallback(n_clicks, neighbourhoodSelector, latitude, longitude):
 	else:
 		return generateMap()
 
+@server.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(server.root_path, 'static'),
+                               'favicon.ico', mimetype='image/airbnb.ico')
 
 if __name__ == '__main__':
 	app.run_server(debug=True)
