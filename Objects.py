@@ -1,35 +1,81 @@
 import csv
 
-class Listing:
-	def __init__(self, id, latitude, longitude, price, neighbourhood_cleansed):
-		self.id = id
-		self.coords = [latitude, longitude]
-		self.price = float(price)
-		self.neighbourhood = neighbourhood_cleansed
-		self.nightsBookedPerWeek = 0
+class Neighbourhood:
+	def __init__(self, name):
+		self.name = name
+		self.ids = []
+		self.latitudes = []
+		self.longitudes = []
+		self.totalReviewScore = 0
+		self.totalCost = 0
+		self.totalNightsBooked = 0
+		self.numberListings = 0
+		self.numberWeeklyBookingsPerPrice = {}
+		self.numberListingsPerPrice = {}
+
+	def addListing(self, idNum, lat, lon, price, score, availableInYear):
+		self.ids.append(idNum)
+		self.numberListings = self.numberListings + 1
+		self.latitudes.append(lat)
+		self.longitudes.append(lon)
+		self.totalCost = self.totalCost + price
+		self.totalReviewScore = self.totalReviewScore + float(score)
+		# assumes owner rents airbnb out half of the year and
+		# when airbnb is not available, it's been booked
+		nightsBookedInYear = 365 - int(availableInYear)
+		self.totalNightsBooked = self.totalNightsBooked + nightsBookedInYear
+		if int(availableInYear) == 0 and self.name != "Presidio":
+			timesBookedInWeek = 7
+		else:
+			timesBookedInWeek = nightsBookedInYear / 52
+
+		
+		if price in self.numberWeeklyBookingsPerPrice:
+			self.numberWeeklyBookingsPerPrice[price] = self.numberWeeklyBookingsPerPrice[price] + timesBookedInWeek
+			self.numberListingsPerPrice[price] = self.numberListingsPerPrice[price] + 1
+		else:
+			self.numberWeeklyBookingsPerPrice[price] = timesBookedInWeek
+			self.numberListingsPerPrice[price] = 1
+
+	def getIDs(self):
+		return self.ids
+	def getLatitudes(self):
+		return self.latitudes
+	def getLongitudes(self):
+		return self.longitudes
+	# returns average price per night of neighbourhood
+	def getAveragePPN(self):
+		return self.totalCost / self.numberListings
+	# returns average review score of neighbourhood
+	def getAverageReviewScore(self):
+		return self.totalReviewScore / self.numberListings
+	def getAverageNumberNightsBookedPerWeek(self):
+		return (float(self.totalNightsBooked) / float(self.numberListings)) / 52
+	# returns expected income of home in this neighbourhood
+	def getAverageWeeklyIncome(self):
+		return self.getAveragePPN() * self.getAverageNumberNightsBookedPerWeek()
+	# returns ideal PPN to list booking at to maximize revenue
+	def getIdealPPN(self):
+		returnArray = [0,0,0] # returnArray[0] = best price, returnArray[1] = best revenue
+		for price in self.numberWeeklyBookingsPerPrice.keys():
+			if self.numberListingsPerPrice[price] > 1 or self.name == "Presidio":
+				weeklyBookings = float(self.numberWeeklyBookingsPerPrice[price]) / float(self.numberListingsPerPrice[price])
+				expectedRevenue = price * (weeklyBookings)
+
+				if float(expectedRevenue) > float(returnArray[1]):
+					returnArray[0] = price
+					returnArray[1] = expectedRevenue
+					returnArray[2] = weeklyBookings
+				
+		return returnArray
+
 
 class ListingsTracker:
 	def __init__(self):
-		self.latitudes = []
-		self.longitudes = []
-		self.ids = []
-		self.neighbourhoods = []
-		self.ppn = {}
-		self.listings = []
-		self.reviewScores = {}
-		self.freeNightsPerPrice = {}
-		self.listingsPerPrice = {}
-
-		# for neighbourhood specific things
-		self.latitudesByNeighbourhood = {}
-		self.longitudesByNeighbourhood = {}
-		self.idsByNeighbourhood = {}
-
+		self.neighbourhoods = {}
 
 		self.readNeighbourhoods()
 		self.readListings()
-		self.readAvailabilities()
-
 
 	# returns list of neighbourhoods
 	def readNeighbourhoods(self):
@@ -37,109 +83,59 @@ class ListingsTracker:
 			reader = csv.DictReader(neighbourhoodsFile, delimiter=',')
 			# read through entries, adding to neighbourhood list and price per neighbourhood dictionary
 			for row in reader:
-				neighbourhood = row["neighbourhood"]
-				self.neighbourhoods.append(neighbourhood)
-				self.latitudesByNeighbourhood[neighbourhood] = []
-				self.longitudesByNeighbourhood[neighbourhood] = []
-				self.idsByNeighbourhood[neighbourhood] = []
-				self.ppn[neighbourhood] = 0
-
+				newNeighbourhood = Neighbourhood(row["neighbourhood"])
+				self.neighbourhoods[row["neighbourhood"]] = newNeighbourhood
 
 	def readListings(self):
 		neighbourhoodTotalPrices = {}
 		neighbourhoodCount = {}
-		with open('./data/listings.csv', newline='', errors='ignore') as listingsFile:
-			# DictReader reads specific column
+		with open('./data/important-airbnb-data.csv', newline='', errors='ignore') as listingsFile:
 			reader = csv.DictReader(listingsFile, delimiter=',')
 			for row in reader:
-				# cut out listings where not all fields exist
-				if row["id"] and row["latitude"] and row["longitude"] and row["price"] and row["neighbourhood_cleansed"] and row["review_scores_rating"]:
-					newListing = Listing(row["id"], row["latitude"], row["longitude"], row["price"].replace(',','').replace('$',''), row["neighbourhood_cleansed"])
-					self.listings.append(newListing)
-					self.latitudes.append(row["latitude"])
-					self.longitudes.append(row["longitude"])
-					self.latitudesByNeighbourhood[row["neighbourhood_cleansed"]].append(row["latitude"])
-					self.longitudesByNeighbourhood[row["neighbourhood_cleansed"]].append(row["longitude"])
-					self.ids.append(row["id"])
-
-					# edit price per neighbourhood dictionary
-					newNeighbourhood = newListing.neighbourhood
-					if newNeighbourhood in neighbourhoodTotalPrices:
-						neighbourhoodTotalPrices[newNeighbourhood] = neighbourhoodTotalPrices[newNeighbourhood] + newListing.price
-						neighbourhoodCount[newNeighbourhood] = neighbourhoodCount[newNeighbourhood] + 1
-						self.reviewScores[newNeighbourhood] = self.reviewScores[newNeighbourhood] + float(row["review_scores_rating"])
-
-					else:
-						neighbourhoodTotalPrices[newNeighbourhood] = newListing.price
-						neighbourhoodCount[newNeighbourhood] = 1
-						self.reviewScores[newNeighbourhood] = float(row["review_scores_rating"])
-
-
-
-		for neighbourhood in neighbourhoodTotalPrices:
-			self.ppn[neighbourhood] = neighbourhoodTotalPrices[neighbourhood] / neighbourhoodCount[neighbourhood]
-			self.reviewScores[neighbourhood] = self.reviewScores[neighbourhood] / neighbourhoodCount[neighbourhood]
-			
-
-	def readAvailabilities(self):
-		with open('./data/calendar_available_only.csv', newline='', errors='ignore') as availabilityFile:
-			reader = csv.DictReader(availabilityFile, delimiter=',')
-			# read through entries, adding to neighbourhood list and price per neighbourhood dictionary
-			for row in reader:
-				if row["price"] and row["listing_id"]:
-					price = float(row["price"].replace(',','').replace('$',''))
-					if price in self.freeNightsPerPrice:
-						self.freeNightsPerPrice[price] = self.freeNightsPerPrice[price] + 1
-						if not row["listing_id"] in self.listingsPerPrice[price]:
-							self.listingsPerPrice[price].append(row["listing_id"])
-					else:
-						self.freeNightsPerPrice[price] = 1
-						self.listingsPerPrice[price] = [row["listing_id"]]
+				# get neighbourhood object
+				neighbourhood = self.neighbourhoods[row["neighbourhood_cleansed"]]
+				newPrice = float(row["price"].replace(',','').replace('$',''))
+				neighbourhood.addListing(row["id"],row["latitude"],row["longitude"],newPrice,row["review_scores_rating"], row["availability_365"])					
 					
-					
-
-	# getters
-	def getListings(self):
-		return self.listings
+	# returns array of strings
 	def getNeighbourhoods(self):
-		return self.neighbourhoods
-	def getLongitudes(self, neighbourhood=None):
-		if neighbourhood is None:
-			return self.longitudes
-		else:
-			return self.longitudesByNeighbourhood[neighbourhood]
-		
-	def getLatitudes(self, neighbourhood=None):
-		if neighbourhood is None:
-			return self.latitudes
-		else:
-			return self.latitudesByNeighbourhood[neighbourhood]
+		return sorted(list(self.neighbourhoods.keys()))
 
-	def getIds(self, neighbourhood=None):
+	def getIDs(self, neighbourhood):
+		return self.neighbourhoods[neighbourhood].getIDs()
+	def getLatitudes(self, neighbourhood):
+		return self.neighbourhoods[neighbourhood].getLatitudes()
+	def getLongitudes(self, neighbourhood):
+		return self.neighbourhoods[neighbourhood].getLongitudes()
+	def getPPN(self, neighbourhood = None):
 		if neighbourhood is None:
-			return self.ids
+			allPPN = {}
+			for neighbourhood in self.neighbourhoods:
+				allPPN[neighbourhood] = self.neighbourhoods[neighbourhood].getAveragePPN()
+			return allPPN
 		else:
-			return self.idsByNeighbourhood[neighbourhood]
+			return self.neighbourhoods[neighbourhood].getAveragePPN()
 
-	def getPPN(self):
-		return self.ppn
 	def getBookedNightsPerPrice(self):
 		bookedNightsPerPrice = {}
 		for price in self.freeNightsPerPrice:
 			if price < 600:
 				numberListingsPerPrice = len(self.listingsPerPrice[price])
-				print(str(price) + ": " + str(self.freeNightsPerPrice[price]) + " : " + str(numberListingsPerPrice))
 				bookedNightsPerPrice[price] = (178 - float(self.freeNightsPerPrice[price]/numberListingsPerPrice))/26
 		return bookedNightsPerPrice
 
 	def getReviewScoresPerNeighbourhood(self):
-		return self.reviewScores
+		reviewScoresPerNeighbourhood = {}
+		for neighbourhood in self.neighbourhoods:
+			reviewScoresPerNeighbourhood[neighbourhood] = self.neighbourhoods[neighbourhood].getAverageReviewScore()
+		return reviewScoresPerNeighbourhood
 
-	def printPPN(self):
-		for n in self.ppn:
-			print ("{0}: ${1:.2f}".format(n,self.ppn[n]))
+	def getAverageWeeklyIncome(self, neighbourhood):
+		return self.neighbourhoods[neighbourhood].getAverageWeeklyIncome()
 
+	def getAverageBookingsPerWeek(self, neighbourhood):
+		return self.neighbourhoods[neighbourhood].getAverageNumberNightsBookedPerWeek()
 
-
-
+	def getOptimalPrice(self, neighbourhood):
+		return self.neighbourhoods[neighbourhood].getIdealPPN()
 

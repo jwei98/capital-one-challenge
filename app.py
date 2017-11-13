@@ -2,18 +2,23 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from Objects import ListingsTracker
-import avg_income_calculator as calculator
+import geopy_calculator as calculator
 import plotly.graph_objs as go
 import colorlover as cl
 import json
 from collections import OrderedDict
-import plotly.figure_factory as ff
+
 
 mapbox_access_token = 'pk.eyJ1IjoianVzdGlud2VpIiwiYSI6ImNqOWdqd2JlMzJwODMyeHBhZ3JzZTBqcm0ifQ.BR96rueM9hQkPc7GeozPiw'
 
 app = dash.Dash()
 app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
-app.css.append_css({'external_url': 'https://codepen.io/chriddyp/pen/bWLwgP.css'})
+app.config['suppress_callback_exceptions']=True
+
+geopyToAirbnbDictionary = {'Bayview District': 'Bayview', 'Castro District': 'Castro/Upper Market', \
+	'Crocker-Amazon': 'Crocker Amazon', 'Civic Center': 'Downtown/Civic Center',
+	'Portola':'Excelsior', 'Richmond District': 'Inner Richmond', 'Anza Vista': 'Western Addition'}
+
 
 server = app.server
 
@@ -26,19 +31,17 @@ def generateColors(colorArray):
 	for set in scale:
 		for colors in scale[set]:
 			colorArray.append(colors)
-
-	
-
 colors = []
 generateColors(colors)
 
 
-def generateMap():
+def generateMap(latitude = None, longitude = None):
+	userInput = not (latitude is None or longitude is None)
+	zoom = 11
 	data = []
 	colorCounter = 0
 	listingsCounter = 0
 	for n in listingsTracker.getNeighbourhoods():
-		
 		data.append(
 			    go.Scattermapbox(
 			        name=n,
@@ -53,29 +56,45 @@ def generateMap():
 		)
 		
 		colorCounter = colorCounter + 1
+	if userInput:
+		zoom = 13
+		data.append(
+			go.Scattermapbox(
+			        name="Your Location",
+			        lat=[str(latitude)],
+			        lon=[str(longitude)],
+			        mode='markers',
+			        marker= go.Marker(
+			            size=25,
+			            color='gold',
+			        ),
+			)
+		)
 	return html.Div(
     	dcc.Graph(
 	    	id='map-graph',
 	    	figure= {
 	    		'data' : go.Data(data),
 				'layout' : go.Layout(
-					title= 'Map of Listings',
+					title= 'Map of SF Listings',
 				    autosize=True,
 				    hovermode='closest',
 				    mapbox=dict(
 				        accesstoken=mapbox_access_token,
 				        bearing=0,
 				        center=dict(
-				            lat=37.759338,
-				            lon=-122.429020
+				            lat= 37.759338 if not userInput else latitude,
+				            lon=-122.429020 if not userInput else longitude,
 				        ),
 				        pitch=0,
-				        zoom=10
+				        zoom=zoom,
+				        
 				    ),
-				    height=600
+				    height=600,
 				)
 	    	}
 	    ),
+	    id='map-graph-div'
     )
 def generatePPNChart():
 	neighbourhoods = []
@@ -101,21 +120,52 @@ def generatePPNChart():
 				}
 			)
 
-def generateDropdown():
+def generateHeader():
+	return html.Div([
+		html.H1("myAirbnb Calculator"),
+		html.P("by Justin Wei"),], style={'textAlign':'center'})
+def generateCalculator():
+	return html.Div([
+				# inputs for latitude/longitude average income calculator
+				html.H2(children='Calculator'),
+				dcc.Input(
+			    	id='latitude-input',
+			    	placeholder='Enter latitude...',
+			    	type='number',
+			    	value=''
+			    ),
+				dcc.Input(
+			    	id='longitude-input',
+			    	placeholder='Enter longitude...',
+			    	type='number',
+			    	value=''
+			    ),
+			    
+			    html.Button('Calculate', id='calculate-average-weekly-income'),
+			    generateDropdown(False),
+			    html.H2(''),
+			    html.Div(id='average-weekly-income-output',
+			             children=["Enter latitude and longitude, and press calculate"]
+			    )
+		    ]
+	)
+def generateDropdown(isDisable):
 	complete_data = []
 	values = []
 	for neighbourhood in listingsTracker.getNeighbourhoods():
 		data = OrderedDict()
 		data['label'] = neighbourhood
-		data['value'] = neighbourhood[0:4]
+		data['value'] = neighbourhood
 		values.append(neighbourhood)
 		complete_data.append(data)
 	return dcc.Dropdown(
 		id='neighbourhood-selector',
 	    options= complete_data,
-	    multi=True,
-	    value=values
+	    multi=False,
+	    value=values,
+	    disabled=isDisable
 	)
+
 def generateReviewScoresPerNeighbourhoodChart():
 	reviewScores = listingsTracker.getReviewScoresPerNeighbourhood()
 	neighbourhoods = []
@@ -139,7 +189,7 @@ def generateReviewScoresPerNeighbourhoodChart():
 	            'layout': {
 	                'title': 'Average Review Score per Neighbourhood',
 	                'visible': True,
-	                'yaxis': dict(range=[min(scores)-5,100])
+	                'yaxis': dict(range=[min(scores)-5,100]),
 	            }
 			}
 	)
@@ -171,20 +221,32 @@ def generateValueChart():
 			}
 	)
 
-# page layout
-app.layout = html.Div(children=[
+def generatePromptUserForNeighbourhood(latitude, longitude, neighbourhood):
+	return html.Div(children = [
+		html.P('We were able to track the coordinates ({}, {}) to a neighbourhood called {} neighborhood! Please help us by selecting the appropriate neighbourhood above!'.format(latitude,longitude, neighbourhood)),
+	])
 
-	html.H1(children='Optimizing Airbnb Listings'),
-	html.P("by Justin Wei"),
-
-	html.Div(children=''' '''),
-
+def generateFoundListingNeighbourhood(latitude, longitude, neighbourhood, userInput):
+	if userInput:
+		introLine = 'The listing at ({}, {}) is located in the {} neighborhood!'.format(latitude,longitude, neighbourhood)
+	else:
+		introLine = ''
+	optimalPrice, optimalRevenue, optimalWeekly = listingsTracker.getOptimalPrice(neighbourhood)
+	return html.Div(children = [
+		html.P('{0} Given an average price per night of ${1:.2f} and {2:.2f} bookings per week, your estimated weekly average income being in the {3} neighbourhood is:'.format(introLine, listingsTracker.getPPN(neighbourhood), listingsTracker.getAverageBookingsPerWeek(neighbourhood), neighbourhood)),
+		html.H4('${0:.2f}'.format(listingsTracker.getAverageWeeklyIncome(neighbourhood))),
+		html.P('You should list your property at...'),
+		html.H4('${0:.2f}'.format(optimalPrice)),
+		html.P('Houses at this price tend to be rented out {0:.2f} times a week, for a total weekly revenue of: '.format(optimalWeekly)),
+		html.H4('${0:.2f}!'.format(optimalRevenue))
+	], style={
+		'text-align': 'center',
+		'border': '2px solid ' + colors[listingsTracker.getNeighbourhoods().index(neighbourhood)],
+		'border-radius': '5px'
+    })
 	
-    html.Div([
-        generateMap()
-    ]),
-
-	html.Div([
+def generateAllCharts():
+	return html.Div([
 	    dcc.Tabs(
 	    	tabs=[
 	    		{'label': 'Average Price Per Night', 'value': 0},
@@ -195,34 +257,26 @@ app.layout = html.Div(children=[
 	    	id='tabs'
 	    ),
 	    html.Div(id='tab-output')
-    ]),
-
-	generateDropdown(),
-
-	# inputs for latitude/longitude average income calculator
-	html.H3(children='Given latitude and longitude, calculate average weekly income:'),
-	dcc.Input(
-    	id='latitude-input',
-    	placeholder='Enter latitude...',
-    	type='number',
-    	value='37.74944922'
-    ),
-	dcc.Input(
-    	id='longitude-input',
-    	placeholder='Enter latitude...',
-    	type='number',
-    	value='-122.4095556'
-    ),
-    html.Button('Calculate', id='calculate-average-weekly-income'),
-    html.Div(id='average-weekly-income-output',
-             children="Enter latitude and longitude, and press calculate"
-    ),
+    ])
 	
-    
-    
 
+# page layout
+app.layout = html.Div(children=[
+
+	generateHeader(),
+    html.Div([
+    	html.Div([
+    		generateMap()
+        ], className="eight columns"),
+        html.Div([
+        	generateCalculator()
+        ], className="four columns"),
+    ], className="row"),
+
+	generateAllCharts(),
 
 ])
+
 
 # given latitude/longitude, calculate average weekly income
 @app.callback(dash.dependencies.Output('tab-output', 'children'), [dash.dependencies.Input('tabs', 'value')])
@@ -234,16 +288,76 @@ def display_content(value):
     else:
     	return generateValueChart()
 
-    
+@app.callback(dash.dependencies.Output(component_id='neighbourhood-selector', component_property='value'),
+	[dash.dependencies.Input(component_id='calculate-average-weekly-income', component_property='n_clicks')])
+def clearSelector(n_clicks):
+	return listingsTracker.getNeighbourhoods()
 
+
+@app.callback(dash.dependencies.Output(component_id='average-weekly-income-output', component_property='children'),
+	[dash.dependencies.Input(component_id='calculate-average-weekly-income', component_property='n_clicks'),
+	 dash.dependencies.Input(component_id='neighbourhood-selector', component_property='value')],
+	[dash.dependencies.State('latitude-input', 'value'),
+	 dash.dependencies.State('longitude-input', 'value')])
+def calculateAverageWeeklyIncome(n_clicks, neighbourhoodSelector, latitude, longitude):
+	isNeighbourhoodSelectorOn = not isinstance(neighbourhoodSelector, list)
+	if (latitude == '' or longitude == ''):
+		if not isNeighbourhoodSelectorOn:
+			return 'Enter latitude and longitude of your listing, i.e. (37.76, -122.43), then press calculate to see your estimated weekly average income and suggested listing price!  Alternatively, you may select a neighbourhood to see average prices below!'
+		elif isNeighbourhoodSelectorOn:
+			if neighbourhoodSelector in listingsTracker.getNeighbourhoods():
+				return generateFoundListingNeighbourhood(latitude, longitude, neighbourhoodSelector, False)
+			else:
+				return generatePromptUserForNeighbourhood(latitude, longitude, geopy_neighbourhood)
+	elif (latitude != '' and longitude != ''):
+		# try getting neighbourhood
+		geopy_neighbourhood = calculator.getNeighbourhood(latitude, longitude)
+		# 1) bad location
+		if geopy_neighbourhood is None:
+			return 'Sorry! We could not identify the neighbourhood of the listing at ({}, {})... Please try again! '.format(latitude,longitude)
+		# 2) found everything perfectly
+		elif geopy_neighbourhood in listingsTracker.getNeighbourhoods():
+			return generateFoundListingNeighbourhood(latitude, longitude, geopy_neighbourhood, True)
+		# 3) valid location, but need user help
+		else:
+			if geopy_neighbourhood in geopyToAirbnbDictionary:
+				return generateFoundListingNeighbourhood(latitude, longitude, geopyToAirbnbDictionary[geopy_neighbourhood], True)
+			elif isNeighbourhoodSelectorOn:
+				return generateFoundListingNeighbourhood(latitude, longitude, neighbourhoodSelector, False)
+			else:
+				return generatePromptUserForNeighbourhood(latitude, longitude, geopy_neighbourhood)
+		
+		
+
+# have a "or select a neighborhood" instruction so that we can always display the select neighborhood field
+
+# handles map callbacks
 @app.callback(
-	dash.dependencies.Output(component_id='average-weekly-income-output', component_property='children'),
-	[dash.dependencies.Input(component_id='calculate-average-weekly-income', component_property='n_clicks')],
+	dash.dependencies.Output(component_id='map-graph-div', component_property='children'),
+	[dash.dependencies.Input(component_id='calculate-average-weekly-income', component_property='n_clicks'),
+	dash.dependencies.Input(component_id='neighbourhood-selector', component_property='value')],
 	[dash.dependencies.State('latitude-input', 'value'),
 	 dash.dependencies.State('longitude-input', 'value')]
 )
-def calculateAverageWeeklyIncome(n_clicks, latitude, longitude):
-	return 'The listing at {}, {} is located in the {} neighborhood!'.format(latitude,longitude,calculator.getNeighbourhood(latitude, longitude))
+def mapCallback(n_clicks, neighbourhoodSelector, latitude, longitude):
+	isNeighbourhoodSelectorOn = not isinstance(neighbourhoodSelector, list)
+	if not (latitude == '' or longitude == '' or n_clicks is None) and not isNeighbourhoodSelectorOn:
+		geopy_neighbourhood = calculator.getNeighbourhood(latitude, longitude)
+		if geopy_neighbourhood is None:
+			return generateMap()
+		else:
+			return generateMap(latitude, longitude)
+	elif latitude != '' and longitude != '':
+		return generateMap(latitude, longitude)
+	elif isNeighbourhoodSelectorOn:
+		if neighbourhoodSelector == "Outer Sunset":
+			location = calculator.getCoordsOfNeighbourhood("Sunset District")
+		else:
+			location = calculator.getCoordsOfNeighbourhood(neighbourhoodSelector)
+		return generateMap(location[0], location[1])
+	else:
+		return generateMap()
+
 
 if __name__ == '__main__':
 	app.run_server(debug=True)
