@@ -18,7 +18,7 @@ Github: https://github.com/jwei98/capital-one-challenge
 1. In order to decrease the runtime and space complexity of my web application, I wrote a script (important-data-script.py) to write to a CSV file (important-airbnb-data.csv) that summarized only the necessary data that I used in my application, rather than having to parse the big files every time.
 2. I use a ListingsTracker object (which uses Neighbourhood objects) to handle data calculations, and simply call methods from app.py to retrieve the necessary information to display. This separates the view (app.py) from the data analysis/logic. My callback logic, though, had to be handled in app.py.
 3. Because the neighbourhood geocoding of geopy does not map exactly onto the neighbourhood names that were provided, I added a feature to my web application that allows the web app to employ user faciliation to identify which neighbourhood a listing is located in, if the web app cannot do it itself.
-4. Once the neighbourhood of your listing is identified, the outline of the results in the Calculator section matches the neighbourhood color. Everything is color coded :)
+4. Once the neighbourhood of your listing is identified, the outline of the results in the Calculator section matches the neighbourhood color. Everything is color coded, and it's really cool to be able to see the listings grouped by neighbourhood :)
 
 
 
