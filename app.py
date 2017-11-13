@@ -10,7 +10,7 @@ from collections import OrderedDict
 import os
 from flask import Flask, send_from_directory
 
-# APPLICATION SETUP
+# <------------------ APPLICATION SETUP ------------------>
 server = Flask(__name__, static_folder='static')
 mapbox_access_token = os.environ.get('MAPBOX_KEY')
 app = dash.Dash(server=server)
@@ -25,7 +25,7 @@ def favicon():
                                'favicon.ico', mimetype='image/airbnb.ico')
 
 # maps some common geopy neighbourhoods to scraped neighbourhood names
-geopyToAirbnbDictionary = {'Bayview District': 'Bayview', 'Castro District': 'Castro/Upper Market', \
+geopyToAirbnbDictionary = {'Haight-Ashbury': 'Haight Ashbury', 'Bayview District': 'Bayview', 'Castro District': 'Castro/Upper Market', \
 	'Crocker-Amazon': 'Crocker Amazon', 'Civic Center': 'Downtown/Civic Center',
 	'Portola':'Excelsior', 'Richmond District': 'Inner Richmond', 'Anza Vista': 'Western Addition'}
 
@@ -43,7 +43,7 @@ def generateColors():
 colors = generateColors()
 
 
-# FUNCTIONS THAT HELP DRAW THE APP LAYOUT COMPONENTS
+# <------------------ FUNCTIONS THAT HELP DRAW THE APP LAYOUT COMPONENTS ------------------>
 
 # generates header of page
 def generateHeader():
@@ -53,11 +53,15 @@ def generateHeader():
 
 # generates map
 def generateMap(latitude = None, longitude = None):
+
 	userInput = not (latitude is None or longitude is None)
+
 	zoom = 11
 	data = []
 	colorCounter = 0
 	listingsCounter = 0
+
+	# append data sets that are grouped by neighbourhood and include the locations of listings
 	for n in listingsTracker.getNeighbourhoods():
 		data.append(
 			    go.Scattermapbox(
@@ -73,6 +77,8 @@ def generateMap(latitude = None, longitude = None):
 		)
 		
 		colorCounter = colorCounter + 1
+
+	# if the user inputted a latitude and longitude, then zoom into map on their locaiton and place special marker 
 	if userInput:
 		zoom = 11.5
 		data.append(
@@ -87,6 +93,7 @@ def generateMap(latitude = None, longitude = None):
 			        ),
 			)
 		)
+
 	return html.Div(
     	dcc.Graph(
 	    	id='map-graph',
@@ -316,7 +323,7 @@ def generateAllCharts():
 
 
 
-# PAGE LAYOUT
+# <------------------ PAGE LAYOUT ------------------>
 app.layout = html.Div(children=[
 	generateHeader(),
     html.Div([
@@ -339,7 +346,7 @@ app.layout = html.Div(children=[
 
 
 
-# CALLBACKS
+# <------------------ CALLBACKS ------------------>
 
 # changes calculator display based on what the user inputted, and what is selected in the neighbourhood selector
 @app.callback(dash.dependencies.Output(component_id='average-weekly-income-output', component_property='children'),
@@ -349,14 +356,15 @@ app.layout = html.Div(children=[
 	 dash.dependencies.State('longitude-input', 'value')])
 def calculateAverageWeeklyIncome(n_clicks, neighbourhoodSelector, latitude, longitude):
 	isNeighbourhoodSelectorOn = not isinstance(neighbourhoodSelector, list)
+	# if the user didn't fill in one of the fields
 	if (latitude == '' or longitude == ''):
+		# if the user did not select any neighbourhoods from the selector
 		if not isNeighbourhoodSelectorOn:
 			return 'Enter latitude and longitude of your listing, for example (37.76, -122.43), then press calculate to see your estimated weekly average income and suggested listing price!  Alternatively, you may select a neighbourhood using the selector above!'
+		# if the user selected a neighbourhood from the selector
 		elif isNeighbourhoodSelectorOn:
-			if neighbourhoodSelector in listingsTracker.getNeighbourhoods():
-				return foundListingNeighbourhood(latitude, longitude, neighbourhoodSelector, False)
-			else:
-				return promptUserForNeighbourhood(latitude, longitude, geopy_neighbourhood)
+			return foundListingNeighbourhood(latitude, longitude, neighbourhoodSelector, False)
+	# if we have user input...
 	elif (latitude != '' and longitude != ''):
 		# try getting neighbourhood
 		geopy_neighbourhood = calculator.getNeighbourhood(latitude, longitude)
@@ -366,12 +374,15 @@ def calculateAverageWeeklyIncome(n_clicks, neighbourhoodSelector, latitude, long
 		# 2) found everything perfectly
 		elif geopy_neighbourhood in listingsTracker.getNeighbourhoods():
 			return foundListingNeighbourhood(latitude, longitude, geopy_neighbourhood, True)
-		# 3) valid location, but need user help
+		# 3) valid location, but need user help to identify the exact neighbourhood
 		else:
+			# first check if it's in our geopy->airbnb neighbourhood dictionary
 			if geopy_neighbourhood in geopyToAirbnbDictionary:
 				return foundListingNeighbourhood(latitude, longitude, geopyToAirbnbDictionary[geopy_neighbourhood], True)
+			# check if the user has selected a neighbourhood from the selector
 			elif isNeighbourhoodSelectorOn:
 				return foundListingNeighbourhood(latitude, longitude, neighbourhoodSelector, False)
+			# otherwise, prompt the user to select a neighbourhood
 			else:
 				return promptUserForNeighbourhood(latitude, longitude, geopy_neighbourhood)
 		
@@ -392,20 +403,26 @@ def clearSelector(n_clicks):
 )
 def mapCallback(n_clicks, neighbourhoodSelector, latitude, longitude):
 	isNeighbourhoodSelectorOn = not isinstance(neighbourhoodSelector, list)
+	# if the user enter a latitude and longitude, and didn't select the neighbourhood selector...
 	if not (latitude == '' or longitude == '' or n_clicks is None) and not isNeighbourhoodSelectorOn:
 		geopy_neighbourhood = calculator.getNeighbourhood(latitude, longitude)
+		# if the location they entered doesn't work, generate default map
 		if geopy_neighbourhood is None:
 			return generateMap()
+		# otherwise, generate map with user's location and zoom into their location
 		else:
 			return generateMap(latitude, longitude)
+	# if the user entered a location and then clicked the neighbourhood selector, generate the map using user's location
 	elif latitude != '' and longitude != '':
 		return generateMap(latitude, longitude)
+
 	elif isNeighbourhoodSelectorOn:
 		if neighbourhoodSelector == "Outer Sunset":
 			location = calculator.getCoordsOfNeighbourhood("Sunset District")
 		else:
 			location = calculator.getCoordsOfNeighbourhood(neighbourhoodSelector)
 		return generateMap(location[0], location[1])
+	# generate default map
 	else:
 		return generateMap()
 
