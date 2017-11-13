@@ -13,6 +13,7 @@ class Neighbourhood:
 		self.numberWeeklyBookingsPerPrice = {}
 		self.numberListingsPerPrice = {}
 
+	# update the neighbourhood class everytime we get a new listing
 	def addListing(self, idNum, lat, lon, price, score, availableInYear):
 		self.ids.append(idNum)
 		self.numberListings = self.numberListings + 1
@@ -20,16 +21,16 @@ class Neighbourhood:
 		self.longitudes.append(lon)
 		self.totalCost = self.totalCost + price
 		self.totalReviewScore = self.totalReviewScore + float(score)
-		# assumes owner rents airbnb out half of the year and
-		# when airbnb is not available, it's been booked
+		# assume that when airbnb is not available, it's been booked
 		nightsBookedInYear = 365 - int(availableInYear)
 		self.totalNightsBooked = self.totalNightsBooked + nightsBookedInYear
+		# if the airbnb is available the whole year, skip the division (ends up being a float rounding error)
+		# hard-code fix with Presidio because there are so few listings
 		if int(availableInYear) == 0 and self.name != "Presidio":
 			timesBookedInWeek = 7
 		else:
 			timesBookedInWeek = nightsBookedInYear / 52
 
-		
 		if price in self.numberWeeklyBookingsPerPrice:
 			self.numberWeeklyBookingsPerPrice[price] = self.numberWeeklyBookingsPerPrice[price] + timesBookedInWeek
 			self.numberListingsPerPrice[price] = self.numberListingsPerPrice[price] + 1
@@ -60,6 +61,7 @@ class Neighbourhood:
 	def getIdealPPN(self):
 		returnArray = [0,0,0] # returnArray[0] = best price, returnArray[1] = best revenue
 		for price in self.numberWeeklyBookingsPerPrice.keys():
+			# threshold so that if there is only one listing for that price point, we don't consider the information as valuable
 			if self.numberListingsPerPrice[price] > 1 or self.name == "Presidio":
 				weeklyBookings = float(self.numberWeeklyBookingsPerPrice[price]) / float(self.numberListingsPerPrice[price])
 				expectedRevenue = price * (weeklyBookings)
@@ -79,7 +81,7 @@ class ListingsTracker:
 		self.readNeighbourhoods()
 		self.readListings()
 
-	# returns list of neighbourhoods
+	# creates new neighbourhood classes
 	def readNeighbourhoods(self):
 		with open('./data/neighbourhoods.csv', newline='', errors='ignore') as neighbourhoodsFile:
 			reader = csv.DictReader(neighbourhoodsFile, delimiter=',')
@@ -88,6 +90,7 @@ class ListingsTracker:
 				newNeighbourhood = Neighbourhood(row["neighbourhood"])
 				self.neighbourhoods[row["neighbourhood"]] = newNeighbourhood
 
+	# updates neighbourhood data based on all the listings
 	def readListings(self):
 		neighbourhoodTotalPrices = {}
 		neighbourhoodCount = {}

@@ -16,6 +16,7 @@ def main():
 			reader = csv.DictReader(listingsFile, delimiter=',')
 			for row in reader:
 				if row["id"] and row["latitude"] and row["longitude"] and row["price"] and row["neighbourhood_cleansed"] and row["review_scores_rating"] and row['availability_365']:
+					# threshold for availability. Airbnb must be available at least 3 times in the next year, otherwise convolutes data
 					if int(row["availability_365"]) >= 3:
 						# put relevant fields into dictionary
 						for field in fieldnames:
