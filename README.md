@@ -23,7 +23,7 @@ Github: https://github.com/jwei98/capital-one-challenge
 
 
 **References**:
-1. Dash
+1. Dash/Plotly
 2. Flask
 3. Geopy
 4. Mapbox
