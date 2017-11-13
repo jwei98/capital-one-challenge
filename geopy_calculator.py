@@ -11,11 +11,13 @@ def getNeighbourhood(latitude, longitude):
 	else:
 		location_neighbourhood = location.raw.get("address").get("neighbourhood")
 		return location_neighbourhood
+
 def getCoordsOfNeighbourhood(neighbourhood):
 	if neighbourhood in geolocatorDict:
 		neighbourhood = geolocatorDict.get(neighbourhood)
 
 	location = geolocator.geocode(neighbourhood + ", San Francisco")
 	return [location.raw['lat'], location.raw['lon']]
+
 if __name__ == "__main__":
 	main()
