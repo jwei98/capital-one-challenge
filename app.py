@@ -184,7 +184,7 @@ def generateNumberListingsPerNeighbourhoodChart():
 	                {'x': neighbourhoods,
 	                'y': count,
 	                'type': 'bar',
-	                'name': 'Number Listings per Neighbourhood',
+	                'name': 'Number of Listings per Neighbourhood',
 	                'marker': dict(color = colors[0:37])
 	                }
 	            ],
